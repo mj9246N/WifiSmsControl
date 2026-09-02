@@ -62,24 +62,27 @@ public class SmsReceiver extends BroadcastReceiver {
                     .getSystemService(Context.WIFI_SERVICE);
 
             if (messageBody.contains("wifion")) {
-                // ارسال پیام دریافت دستور
-                try {
-                    sendBaleMessage("📩 دستور دریافت شد: روشن کردن وای‌فای");
-                } catch (Exception e) {
-                    showToast(context, "خطا در ارسال پیام به بله: " + e.getMessage());
-                }
-
-                // اجرای دستور
+                // ابتدا وای‌فای را روشن می‌کنیم
                 wifiManager.setWifiEnabled(true);
 
-                // صبر برای اتصال و ارسال نتیجه
+                // صبر می‌کنیم تا اتصال برقرار شود
                 try {
-                    Thread.sleep(10000); // ۱۰ ثانیه صبر
+                    Thread.sleep(30000); // ۱۰ ثانیه
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
 
-                if (isWifiConnected(context)) {
+                // بعد از صبر، اتصال را بررسی می‌کنیم
+                boolean connected = isWifiConnected(context);
+
+                // حالا سعی می‌کنیم پیام‌ها را ارسال کنیم
+                try {
+                    sendBaleMessage("📩 دستور دریافت شد: روشن کردن وای‌فای");
+                } catch (Exception e) {
+                    showToast(context, "خطا در ارسال پیام دستور به بله: " + e.getMessage());
+                }
+
+                if (connected) {
                     try {
                         sendBaleMessage("✅ وای‌فای روشن شد و به اینترنت متصل است.");
                     } catch (Exception e) {
@@ -94,6 +97,8 @@ public class SmsReceiver extends BroadcastReceiver {
                 }
 
             } else if (messageBody.contains("wifioff")) {
+                // چون وای‌فای هنوز روشن است و اینترنت موجود است،
+                // ارسال پیام‌ها در همان ابتدا انجام می‌شود
                 try {
                     sendBaleMessage("📩 دستور دریافت شد: خاموش کردن وای‌فای");
                 } catch (Exception e) {
