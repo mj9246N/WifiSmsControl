@@ -11,7 +11,6 @@ import android.os.Looper;
 import android.telephony.SmsMessage;
 import android.widget.Toast;
 
-import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -39,11 +38,9 @@ public class SmsReceiver extends BroadcastReceiver {
                 try {
                     handleSms(context, intent);
                 } catch (Exception e) {
-                    // نمایش خطا با Toast
                     showToast(context, "خطای کلی: " + e.getMessage());
                     e.printStackTrace();
                 } finally {
-                    // اعلام پایان کار به سیستم
                     pendingResult.finish();
                 }
             }
@@ -65,40 +62,45 @@ public class SmsReceiver extends BroadcastReceiver {
                 // ابتدا وای‌فای را روشن می‌کنیم
                 wifiManager.setWifiEnabled(true);
 
-                // صبر می‌کنیم تا اتصال برقرار شود
-                try {
-                    Thread.sleep(15000); // ۱۰ ثانیه
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                }
-
-                // بعد از صبر، اتصال را بررسی می‌کنیم
-                boolean connected = isWifiConnected(context);
-
-                // حالا سعی می‌کنیم پیام‌ها را ارسال کنیم
+                // ارسال پیام دریافت دستور (ممکن است به دلیل قطع اینترنت ناموفق باشد)
                 try {
                     sendBaleMessage("📩 دستور دریافت شد: روشن کردن وای‌فای");
                 } catch (Exception e) {
-                    showToast(context, "خطا در ارسال پیام دستور به بله: " + e.getMessage());
+                    showToast(context, "خطا در ارسال پیام دستور: " + e.getMessage());
+                }
+
+                // حلقه بررسی اتصال هر ۵ ثانیه تا حداکثر ۶۰ ثانیه
+                boolean connected = false;
+                int attempts = 0;
+                while (attempts < 12) { // 12 * 5 ثانیه = 60 ثانیه
+                    try {
+                        Thread.sleep(5000); // ۵ ثانیه صبر
+                    } catch (InterruptedException e) {
+                        e.printStackTrace();
+                    }
+                    if (isWifiConnected(context)) {
+                        connected = true;
+                        break;
+                    }
+                    attempts++;
                 }
 
                 if (connected) {
                     try {
                         sendBaleMessage("✅ وای‌فای روشن شد و به اینترنت متصل است.");
                     } catch (Exception e) {
-                        showToast(context, "خطا در ارسال پیام موفقیت به بله: " + e.getMessage());
+                        showToast(context, "خطا در ارسال پیام موفقیت: " + e.getMessage());
                     }
                 } else {
                     try {
-                        sendBaleMessage("⚠️ وای‌فای روشن شد ولی هنوز اتصال برقرار نشده است.");
+                        sendBaleMessage("⚠️ وای‌فای روشن شد ولی اتصال برقرار نشد.");
                     } catch (Exception e) {
-                        showToast(context, "خطا در ارسال پیام هشدار به بله: " + e.getMessage());
+                        showToast(context, "خطا در ارسال پیام هشدار: " + e.getMessage());
                     }
                 }
 
             } else if (messageBody.contains("wifioff")) {
-                // چون وای‌فای هنوز روشن است و اینترنت موجود است،
-                // ارسال پیام‌ها در همان ابتدا انجام می‌شود
+                // چون وای‌فای هنوز روشن است، پیام‌ها قبل از خاموش شدن ارسال می‌شوند
                 try {
                     sendBaleMessage("📩 دستور دریافت شد: خاموش کردن وای‌فای");
                 } catch (Exception e) {
