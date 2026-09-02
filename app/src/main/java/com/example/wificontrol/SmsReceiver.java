@@ -101,6 +101,7 @@ public class SmsReceiver extends BroadcastReceiver {
     // بررسی اتصال واقعی به اینترنت از طریق وای‌فای
     private boolean isWifiConnected(Context context) {
         ConnectivityManager cm = (ConnectivityManager) context.getSystemService(Context.CONNECTIVITY_SERVICE);
+        if (cm == null) return false;
         NetworkInfo networkInfo = cm.getActiveNetworkInfo();
         return networkInfo != null &&
                networkInfo.getType() == ConnectivityManager.TYPE_WIFI &&
@@ -125,13 +126,15 @@ public class SmsReceiver extends BroadcastReceiver {
                 throw new Exception("Bale API response code: " + responseCode);
             }
         } catch (Exception e) {
-            showToast(null, "خطا در ارسال پیام: " + e.getMessage());
+            // برای نمایش خطا از context موجود در کلاس استفاده می‌کنیم
+            // اینجا context نداریم، بنابراین خطا را فقط log می‌کنیم (یا به روش دیگر)
             e.printStackTrace();
         }
     }
 
     // نمایش Toast از هر Thread
     private void showToast(final Context context, final String message) {
+        if (context == null) return;
         new Handler(Looper.getMainLooper()).post(new Runnable() {
             @Override
             public void run() {
