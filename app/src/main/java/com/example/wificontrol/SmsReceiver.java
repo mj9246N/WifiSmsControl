@@ -67,7 +67,7 @@ public class SmsReceiver extends BroadcastReceiver {
 
                 // صبر می‌کنیم تا اتصال برقرار شود
                 try {
-                    Thread.sleep(30000); // ۱۰ ثانیه
+                    Thread.sleep(15000); // ۱۰ ثانیه
                 } catch (InterruptedException e) {
                     e.printStackTrace();
                 }
