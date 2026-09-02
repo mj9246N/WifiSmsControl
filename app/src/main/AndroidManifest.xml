@@ -9,6 +9,9 @@
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
 
+    <!-- مجوز بررسی وضعیت شبکه (برای تشخیص اتصال اینترنت) -->
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+
     <!-- مجوز اینترنت برای ارسال پیام به بله -->
     <uses-permission android:name="android.permission.INTERNET" />
 
