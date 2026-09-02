@@ -6,8 +6,12 @@ import android.content.Intent;
 import android.net.ConnectivityManager;
 import android.net.NetworkInfo;
 import android.net.wifi.WifiManager;
+import android.os.Handler;
+import android.os.Looper;
 import android.telephony.SmsMessage;
+import android.widget.Toast;
 
+import java.io.OutputStream;
 import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
@@ -34,6 +38,10 @@ public class SmsReceiver extends BroadcastReceiver {
             public void run() {
                 try {
                     handleSms(context, intent);
+                } catch (Exception e) {
+                    // نمایش خطا با Toast
+                    showToast(context, "خطای کلی: " + e.getMessage());
+                    e.printStackTrace();
                 } finally {
                     // اعلام پایان کار به سیستم
                     pendingResult.finish();
@@ -42,7 +50,7 @@ public class SmsReceiver extends BroadcastReceiver {
         }).start();
     }
 
-    private void handleSms(Context context, Intent intent) {
+    private void handleSms(Context context, Intent intent) throws Exception {
         Object[] pdus = (Object[]) intent.getExtras().get("pdus");
         if (pdus == null) return;
 
@@ -55,7 +63,11 @@ public class SmsReceiver extends BroadcastReceiver {
 
             if (messageBody.contains("wifion")) {
                 // ارسال پیام دریافت دستور
-                sendBaleMessage("📩 دستور دریافت شد: روشن کردن وای‌فای");
+                try {
+                    sendBaleMessage("📩 دستور دریافت شد: روشن کردن وای‌فای");
+                } catch (Exception e) {
+                    showToast(context, "خطا در ارسال پیام به بله: " + e.getMessage());
+                }
 
                 // اجرای دستور
                 wifiManager.setWifiEnabled(true);
@@ -68,17 +80,33 @@ public class SmsReceiver extends BroadcastReceiver {
                 }
 
                 if (isWifiConnected(context)) {
-                    sendBaleMessage("✅ وای‌فای روشن شد و به اینترنت متصل است.");
+                    try {
+                        sendBaleMessage("✅ وای‌فای روشن شد و به اینترنت متصل است.");
+                    } catch (Exception e) {
+                        showToast(context, "خطا در ارسال پیام موفقیت به بله: " + e.getMessage());
+                    }
                 } else {
-                    sendBaleMessage("⚠️ وای‌فای روشن شد ولی هنوز اتصال برقرار نشده است.");
+                    try {
+                        sendBaleMessage("⚠️ وای‌فای روشن شد ولی هنوز اتصال برقرار نشده است.");
+                    } catch (Exception e) {
+                        showToast(context, "خطا در ارسال پیام هشدار به بله: " + e.getMessage());
+                    }
                 }
 
             } else if (messageBody.contains("wifioff")) {
-                sendBaleMessage("📩 دستور دریافت شد: خاموش کردن وای‌فای");
+                try {
+                    sendBaleMessage("📩 دستور دریافت شد: خاموش کردن وای‌فای");
+                } catch (Exception e) {
+                    showToast(context, "خطا در ارسال پیام به بله: " + e.getMessage());
+                }
 
                 wifiManager.setWifiEnabled(false);
 
-                sendBaleMessage("🔴 وای‌فای خاموش شد.");
+                try {
+                    sendBaleMessage("🔴 وای‌فای خاموش شد.");
+                } catch (Exception e) {
+                    showToast(context, "خطا در ارسال پیام خاموشی به بله: " + e.getMessage());
+                }
             }
         }
     }
@@ -93,21 +121,30 @@ public class SmsReceiver extends BroadcastReceiver {
     }
 
     // ارسال پیام به کانال بله
-    private void sendBaleMessage(String message) {
-        try {
-            String baseUrl = "https://tapi.bale.ai/bot" + BALE_BOT_TOKEN + "/sendMessage";
-            String urlString = baseUrl +
-                    "?chat_id=" + URLEncoder.encode(BALE_CHAT_ID, "UTF-8") +
-                    "&text=" + URLEncoder.encode(message, "UTF-8");
+    private void sendBaleMessage(String message) throws Exception {
+        String baseUrl = "https://tapi.bale.ai/bot" + BALE_BOT_TOKEN + "/sendMessage";
+        String urlString = baseUrl +
+                "?chat_id=" + URLEncoder.encode(BALE_CHAT_ID, "UTF-8") +
+                "&text=" + URLEncoder.encode(message, "UTF-8");
 
-            URL url = new URL(urlString);
-            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-            conn.setRequestMethod("GET");
-            conn.setConnectTimeout(10000);
-            conn.setReadTimeout(10000);
-            conn.getResponseCode(); // ارسال درخواست
-        } catch (Exception e) {
-            e.printStackTrace();
+        URL url = new URL(urlString);
+        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+        conn.setRequestMethod("GET");
+        conn.setConnectTimeout(10000);
+        conn.setReadTimeout(10000);
+        int responseCode = conn.getResponseCode();
+        if (responseCode != HttpURLConnection.HTTP_OK) {
+            throw new Exception("Bale API response code: " + responseCode);
         }
+    }
+
+    // نمایش Toast از هر Thread
+    private void showToast(final Context context, final String message) {
+        new Handler(Looper.getMainLooper()).post(new Runnable() {
+            @Override
+            public void run() {
+                Toast.makeText(context, message, Toast.LENGTH_LONG).show();
+            }
+        });
     }
 }
