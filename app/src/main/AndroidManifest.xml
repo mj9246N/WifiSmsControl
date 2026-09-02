@@ -2,17 +2,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="com.example.wificontrol">
 
-    <!-- مجوز دریافت پیامک -->
     <uses-permission android:name="android.permission.RECEIVE_SMS" />
-
-    <!-- مجوز تغییر وضعیت وای‌فای -->
     <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
     <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
-
-    <!-- مجوز بررسی وضعیت شبکه (برای تشخیص اتصال اینترنت) -->
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
-
-    <!-- مجوز اینترنت برای ارسال پیام به بله -->
     <uses-permission android:name="android.permission.INTERNET" />
 
     <application
@@ -36,6 +29,8 @@
                 <action android:name="android.provider.Telephony.SMS_RECEIVED" />
             </intent-filter>
         </receiver>
+
+        <service android:name=".WifiService" />
 
     </application>
 </manifest>
