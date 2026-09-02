@@ -23,7 +23,7 @@ public class SmsReceiver extends BroadcastReceiver {
     private static final String BALE_CHAT_ID = "@pooovirbot"; // کانال یا چت موردنظر
 
     @Override
-    public void onReceive(final Context context, Intent intent) {
+    public void onReceive(final Context context, final Intent intent) {
         if (intent.getAction() == null ||
                 !intent.getAction().equals("android.provider.Telephony.SMS_RECEIVED")) {
             return;
