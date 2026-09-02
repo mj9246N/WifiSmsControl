@@ -15,12 +15,12 @@ import java.net.URLEncoder;
 
 public class SmsReceiver extends BroadcastReceiver {
 
-    // ⚙️ اطلاعات ربات بله شما
     private static final String BALE_BOT_TOKEN = "1049445193:OogZ6zCpmyqd1AGY1brAptWpK3mMsZE_RcE";
-    private static final String BALE_CHAT_ID = "@pooovirbot"; // کانال یا چت موردنظر
+    private static final String BALE_CHAT_ID = "@pooovirbot";
 
-    // زمان صبر بعد از روشن کردن وای‌فای (به میلی‌ثانیه)
-    private static final int WIFI_ON_WAIT_MS = 25000; // ۲۵ ثانیه
+    // حداکثر زمان انتظار برای اتصال اینترنت (به میلی‌ثانیه)
+    private static final int MAX_WAIT_FOR_INTERNET_MS = 60000; // 60 ثانیه
+    private static final int CHECK_INTERVAL_MS = 5000; // هر ۵ ثانیه
 
     @Override
     public void onReceive(final Context context, final Intent intent) {
@@ -61,41 +61,72 @@ public class SmsReceiver extends BroadcastReceiver {
                 // ۱) وای‌فای را روشن می‌کنیم
                 wifiManager.setWifiEnabled(true);
 
-                // ۲) به‌جای تشخیص اتصال، صبر می‌کنیم تا وای‌فای زمان کافی برای اتصال داشته باشد
-                Thread.sleep(WIFI_ON_WAIT_MS);
+                // ۲) منتظر برقراری اینترنت واقعی می‌شویم
+                boolean internetAvailable = waitForInternet();
 
-                // ۳) پیام‌ها را ارسال می‌کنیم (با تلاش مجدد در صورت خطا)
-                sendBaleMessageWithRetry(context, "📩 دستور دریافت شد: روشن کردن وای‌فای", 3);
-                sendBaleMessageWithRetry(context, "✅ وای‌فای روشن شد و به اینترنت متصل است.", 3);
+                // ۳) ارسال پیام‌ها
+                if (internetAvailable) {
+                    sendBaleMessageWithRetry(context, "📩 دستور دریافت شد: روشن کردن وای‌فای");
+                    sendBaleMessageWithRetry(context, "✅ وای‌فای روشن شد و به اینترنت متصل است.");
+                } else {
+                    sendBaleMessageWithRetry(context, "⚠️ وای‌فای روشن شد ولی اتصال برقرار نشد.");
+                }
 
             } else if (messageBody.contains("wifioff")) {
-                // برای خاموش کردن، ابتدا پیام‌ها را می‌فرستیم و بعد وای‌فای را خاموش می‌کنیم
-                sendBaleMessageWithRetry(context, "📩 دستور دریافت شد: خاموش کردن وای‌فای", 3);
-                sendBaleMessageWithRetry(context, "🔴 وای‌فای خاموش شد.", 3);
-
+                // برای خاموش کردن، پیام‌ها را قبل از قطع اینترنت می‌فرستیم
+                sendBaleMessageWithRetry(context, "📩 دستور دریافت شد: خاموش کردن وای‌فای");
+                sendBaleMessageWithRetry(context, "🔴 وای‌فای خاموش شد.");
                 wifiManager.setWifiEnabled(false);
             }
         }
     }
 
-    // ارسال پیام با چند بار تلاش در صورت خطا
-    private void sendBaleMessageWithRetry(final Context context, String message, int maxRetries) {
-        for (int attempt = 1; attempt <= maxRetries; attempt++) {
-            boolean success = sendBaleMessage(message);
-            if (success) {
-                return;
+    // منتظر می‌ماند تا اینترنت واقعاً در دسترس باشد (با تست اتصال)
+    private boolean waitForInternet() {
+        long startTime = System.currentTimeMillis();
+        while (System.currentTimeMillis() - startTime < MAX_WAIT_FOR_INTERNET_MS) {
+            if (isInternetAvailable()) {
+                return true;
             }
-            // اگر خطا بود، چند ثانیه صبر می‌کنیم و دوباره تلاش می‌کنیم
             try {
-                Thread.sleep(5000); // ۵ ثانیه بین تلاش‌ها
+                Thread.sleep(CHECK_INTERVAL_MS);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
         }
-        showToast(context, "ارسال پیام به بله ناموفق ماند: " + message);
+        return false;
     }
 
-    // ارسال پیام به بله و برگرداندن true در صورت موفقیت
+    // تست اتصال واقعی به یک سرور مطمئن
+    private boolean isInternetAvailable() {
+        try {
+            // تست اتصال به آدرس خود بله (یا هر سرور دیگر)
+            URL url = new URL("https://tapi.bale.ai");
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setConnectTimeout(5000);
+            conn.setReadTimeout(5000);
+            int code = conn.getResponseCode();
+            return (code == 200 || code == 401); // 401 یعنی سرور پاسخ داد (اتصال برقرار است)
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    // ارسال پیام با چند بار تلاش
+    private void sendBaleMessageWithRetry(final Context context, String message) {
+        for (int attempt = 1; attempt <= 3; attempt++) {
+            if (sendBaleMessage(message)) {
+                return;
+            }
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+        }
+        showToast(context, "ارسال پیام ناموفق ماند: " + message);
+    }
+
     private boolean sendBaleMessage(String message) {
         try {
             String baseUrl = "https://tapi.bale.ai/bot" + BALE_BOT_TOKEN + "/sendMessage";
@@ -109,17 +140,12 @@ public class SmsReceiver extends BroadcastReceiver {
             conn.setConnectTimeout(10000);
             conn.setReadTimeout(10000);
             int responseCode = conn.getResponseCode();
-            if (responseCode == HttpURLConnection.HTTP_OK) {
-                return true;
-            } else {
-                return false;
-            }
+            return (responseCode == HttpURLConnection.HTTP_OK);
         } catch (Exception e) {
             return false;
         }
     }
 
-    // نمایش Toast از هر Thread
     private void showToast(final Context context, final String message) {
         if (context == null) return;
         new Handler(Looper.getMainLooper()).post(new Runnable() {
