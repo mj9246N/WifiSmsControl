@@ -28,10 +28,8 @@ public class SmsReceiver extends BroadcastReceiver {
             return;
         }
 
-        // دریافت PendingResult برای ادامه‌ی کار در پس‌زمینه
         final PendingResult pendingResult = goAsync();
 
-        // اجرای عملیات در یک Thread جداگانه
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -59,63 +57,45 @@ public class SmsReceiver extends BroadcastReceiver {
                     .getSystemService(Context.WIFI_SERVICE);
 
             if (messageBody.contains("wifion")) {
-                // ابتدا وای‌فای را روشن می‌کنیم
+                // ۱) وای‌فای را روشن می‌کنیم
                 wifiManager.setWifiEnabled(true);
 
-                // ارسال پیام دریافت دستور (ممکن است به دلیل قطع اینترنت ناموفق باشد)
-                try {
-                    sendBaleMessage("📩 دستور دریافت شد: روشن کردن وای‌فای");
-                } catch (Exception e) {
-                    showToast(context, "خطا در ارسال پیام دستور: " + e.getMessage());
-                }
+                // ۲) منتظر اتصال واقعی می‌مانیم (حداکثر ۶۰ ثانیه، بررسی هر ۵ ثانیه)
+                boolean connected = waitForWifiConnection(context, 12, 5000);
 
-                // حلقه بررسی اتصال هر ۵ ثانیه تا حداکثر ۶۰ ثانیه
-                boolean connected = false;
-                int attempts = 0;
-                while (attempts < 12) { // 12 * 5 ثانیه = 60 ثانیه
-                    try {
-                        Thread.sleep(5000); // ۵ ثانیه صبر
-                    } catch (InterruptedException e) {
-                        e.printStackTrace();
-                    }
-                    if (isWifiConnected(context)) {
-                        connected = true;
-                        break;
-                    }
-                    attempts++;
-                }
-
+                // ۳) حالا که اینترنت برقرار است (یا نشده)، پیام‌ها را ارسال می‌کنیم
                 if (connected) {
-                    try {
-                        sendBaleMessage("✅ وای‌فای روشن شد و به اینترنت متصل است.");
-                    } catch (Exception e) {
-                        showToast(context, "خطا در ارسال پیام موفقیت: " + e.getMessage());
-                    }
+                    sendBaleMessage("📩 دستور دریافت شد: روشن کردن وای‌فای");
+                    sendBaleMessage("✅ وای‌فای روشن شد و به اینترنت متصل است.");
                 } else {
-                    try {
-                        sendBaleMessage("⚠️ وای‌فای روشن شد ولی اتصال برقرار نشد.");
-                    } catch (Exception e) {
-                        showToast(context, "خطا در ارسال پیام هشدار: " + e.getMessage());
-                    }
+                    // در این حالت اینترنت قطع است، اما سعی می‌کنیم پیام هشدار را بفرستیم
+                    sendBaleMessage("⚠️ وای‌فای روشن شد ولی اتصال برقرار نشد.");
                 }
 
             } else if (messageBody.contains("wifioff")) {
-                // چون وای‌فای هنوز روشن است، پیام‌ها قبل از خاموش شدن ارسال می‌شوند
-                try {
-                    sendBaleMessage("📩 دستور دریافت شد: خاموش کردن وای‌فای");
-                } catch (Exception e) {
-                    showToast(context, "خطا در ارسال پیام به بله: " + e.getMessage());
-                }
+                // چون وای‌فای هنوز روشن است، هر دو پیام را قبل از خاموش کردن می‌فرستیم
+                sendBaleMessage("📩 دستور دریافت شد: خاموش کردن وای‌فای");
+                sendBaleMessage("🔴 وای‌فای خاموش شد.");
 
+                // سپس وای‌فای را خاموش می‌کنیم
                 wifiManager.setWifiEnabled(false);
-
-                try {
-                    sendBaleMessage("🔴 وای‌فای خاموش شد.");
-                } catch (Exception e) {
-                    showToast(context, "خطا در ارسال پیام خاموشی به بله: " + e.getMessage());
-                }
             }
         }
+    }
+
+    // حلقه انتظار برای اتصال وای‌فای
+    private boolean waitForWifiConnection(Context context, int maxAttempts, int delayMs) {
+        for (int i = 0; i < maxAttempts; i++) {
+            try {
+                Thread.sleep(delayMs);
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            }
+            if (isWifiConnected(context)) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // بررسی اتصال واقعی به اینترنت از طریق وای‌فای
@@ -128,20 +108,25 @@ public class SmsReceiver extends BroadcastReceiver {
     }
 
     // ارسال پیام به کانال بله
-    private void sendBaleMessage(String message) throws Exception {
-        String baseUrl = "https://tapi.bale.ai/bot" + BALE_BOT_TOKEN + "/sendMessage";
-        String urlString = baseUrl +
-                "?chat_id=" + URLEncoder.encode(BALE_CHAT_ID, "UTF-8") +
-                "&text=" + URLEncoder.encode(message, "UTF-8");
+    private void sendBaleMessage(String message) {
+        try {
+            String baseUrl = "https://tapi.bale.ai/bot" + BALE_BOT_TOKEN + "/sendMessage";
+            String urlString = baseUrl +
+                    "?chat_id=" + URLEncoder.encode(BALE_CHAT_ID, "UTF-8") +
+                    "&text=" + URLEncoder.encode(message, "UTF-8");
 
-        URL url = new URL(urlString);
-        HttpURLConnection conn = (HttpURLConnection) url.openConnection();
-        conn.setRequestMethod("GET");
-        conn.setConnectTimeout(10000);
-        conn.setReadTimeout(10000);
-        int responseCode = conn.getResponseCode();
-        if (responseCode != HttpURLConnection.HTTP_OK) {
-            throw new Exception("Bale API response code: " + responseCode);
+            URL url = new URL(urlString);
+            HttpURLConnection conn = (HttpURLConnection) url.openConnection();
+            conn.setRequestMethod("GET");
+            conn.setConnectTimeout(15000);
+            conn.setReadTimeout(15000);
+            int responseCode = conn.getResponseCode();
+            if (responseCode != HttpURLConnection.HTTP_OK) {
+                throw new Exception("Bale API response code: " + responseCode);
+            }
+        } catch (Exception e) {
+            showToast(null, "خطا در ارسال پیام: " + e.getMessage());
+            e.printStackTrace();
         }
     }
 
