@@ -18,12 +18,14 @@ public class AlarmReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
-        // ارسال پیام‌ها بعد از تأخیر ۳۰ ثانیه
+        // برای استفاده در کلاس داخلی، متغیر final می‌سازیم
+        final Context finalContext = context;
+
         new Thread(new Runnable() {
             @Override
             public void run() {
-                sendBaleMessageWithRetry(context, "📩 دستور دریافت شد: روشن کردن وای‌فای");
-                sendBaleMessageWithRetry(context, "✅ وای‌فای روشن شد و به اینترنت متصل است.");
+                sendBaleMessageWithRetry(finalContext, "📩 دستور دریافت شد: روشن کردن وای‌فای");
+                sendBaleMessageWithRetry(finalContext, "✅ وای‌فای روشن شد و به اینترنت متصل است.");
             }
         }).start();
     }
