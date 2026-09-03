@@ -1,10 +1,11 @@
 package com.example.wificontrol;
 
-import android.app.IntentService;
+import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
 import android.net.wifi.WifiManager;
 import android.os.Handler;
+import android.os.IBinder;
 import android.os.Looper;
 import android.widget.Toast;
 
@@ -12,22 +13,43 @@ import java.net.HttpURLConnection;
 import java.net.URL;
 import java.net.URLEncoder;
 
-public class WifiService extends IntentService {
+public class WifiService extends Service {
 
     private static final String BALE_BOT_TOKEN = "1049445193:OogZ6zCpmyqd1AGY1brAptWpK3mMsZE_RcE";
     private static final String BALE_CHAT_ID = "@pooovirbot";
 
-    public WifiService() {
-        super("WifiService");
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        if (intent == null) {
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+
+        final String command = intent.getStringExtra("command");
+        if (command == null) {
+            stopSelf(startId);
+            return START_NOT_STICKY;
+        }
+
+        // هر دستور در یک Thread جداگانه اجرا می‌شود تا صف ایجاد نشود
+        new Thread(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                    handleCommand(command);
+                } catch (Exception e) {
+                    showToast("خطا: " + e.getMessage());
+                } finally {
+                    // پایان این شروع، اما اگر شروع‌های دیگری هست سرویس زنده می‌ماند
+                    stopSelf(startId);
+                }
+            }
+        }).start();
+
+        return START_NOT_STICKY;
     }
 
-    @Override
-    protected void onHandleIntent(Intent intent) {
-        if (intent == null) return;
-
-        String command = intent.getStringExtra("command");
-        if (command == null) return;
-
+    private void handleCommand(String command) {
         WifiManager wifiManager = (WifiManager) getApplicationContext()
                 .getSystemService(Context.WIFI_SERVICE);
 
@@ -36,13 +58,14 @@ public class WifiService extends IntentService {
             sendBaleMessageWithRetry("📩 دستور دریافت شد: خاموش کردن وای‌فای");
             sendBaleMessageWithRetry("🔴 وای‌فای خاموش شد.");
             wifiManager.setWifiEnabled(false);
+
         } else if (command.equals("on")) {
-            // وای‌فای را روشن می‌کنیم
+            // وای‌فای را بلافاصله روشن می‌کنیم
             wifiManager.setWifiEnabled(true);
 
             // صبر می‌کنیم تا اتصال برقرار شود (مثلاً ۳۰ ثانیه)
             try {
-                Thread.sleep(30000); // ۳۰ ثانیه
+                Thread.sleep(23000);
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
@@ -93,5 +116,10 @@ public class WifiService extends IntentService {
                 Toast.makeText(WifiService.this, message, Toast.LENGTH_LONG).show();
             }
         });
+    }
+
+    @Override
+    public IBinder onBind(Intent intent) {
+        return null;
     }
 }
