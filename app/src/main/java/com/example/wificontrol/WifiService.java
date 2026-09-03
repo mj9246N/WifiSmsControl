@@ -31,7 +31,9 @@ public class WifiService extends Service {
             return START_NOT_STICKY;
         }
 
-        // هر دستور در یک Thread جداگانه اجرا می‌شود تا صف ایجاد نشود
+        // برای استفاده در کلاس داخلی، متغیر final می‌سازیم
+        final int finalStartId = startId;
+
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -40,8 +42,7 @@ public class WifiService extends Service {
                 } catch (Exception e) {
                     showToast("خطا: " + e.getMessage());
                 } finally {
-                    // پایان این شروع، اما اگر شروع‌های دیگری هست سرویس زنده می‌ماند
-                    stopSelf(startId);
+                    stopSelf(finalStartId);
                 }
             }
         }).start();
@@ -54,23 +55,19 @@ public class WifiService extends Service {
                 .getSystemService(Context.WIFI_SERVICE);
 
         if (command.equals("off")) {
-            // برای خاموش کردن، پیام‌ها را قبل از قطع وای‌فای می‌فرستیم
             sendBaleMessageWithRetry("📩 دستور دریافت شد: خاموش کردن وای‌فای");
             sendBaleMessageWithRetry("🔴 وای‌فای خاموش شد.");
             wifiManager.setWifiEnabled(false);
 
         } else if (command.equals("on")) {
-            // وای‌فای را بلافاصله روشن می‌کنیم
             wifiManager.setWifiEnabled(true);
 
-            // صبر می‌کنیم تا اتصال برقرار شود (مثلاً ۳۰ ثانیه)
             try {
-                Thread.sleep(23000);
+                Thread.sleep(23000); // ۲۳ ثانیه
             } catch (InterruptedException e) {
                 e.printStackTrace();
             }
 
-            // حالا پیام‌ها را ارسال می‌کنیم
             sendBaleMessageWithRetry("📩 دستور دریافت شد: روشن کردن وای‌فای");
             sendBaleMessageWithRetry("✅ وای‌فای روشن شد و به اینترنت متصل است.");
         }
