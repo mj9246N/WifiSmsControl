@@ -25,13 +25,24 @@ public class SmsReceiver extends BroadcastReceiver {
             SmsMessage sms = SmsMessage.createFromPdu((byte[]) pdu);
             String messageBody = sms.getMessageBody().toLowerCase();
 
-            // بررسی سن پیامک
+            // بررسی سن پیامک (برای جلوگیری از اجرای پیامک‌های قدیمی)
             long smsTime = sms.getTimestampMillis();
             long now = System.currentTimeMillis();
-
-            // اگر timestamp موجود بود و پیامک قدیمی‌تر از حد مجاز است، نادیده بگیر
             if (smsTime > 0 && (now - smsTime) > MAX_SMS_AGE_MS) {
                 Toast.makeText(context, "پیامک قدیمی نادیده گرفته شد", Toast.LENGTH_SHORT).show();
+                continue;
+            }
+
+            // تعیین دستور بر اساس محتوای پیامک
+            String command = null;
+            if (messageBody.contains("wifion")) {
+                command = "on";
+            } else if (messageBody.contains("wifioff")) {
+                command = "off";
+            }
+
+            // اگر دستور null باشد، یعنی پیامک مربوط به ما نیست → نادیده بگیر
+            if (command == null) {
                 continue;
             }
 
@@ -40,7 +51,7 @@ public class SmsReceiver extends BroadcastReceiver {
 
             // ساخت intent برای سرویس
             Intent serviceIntent = new Intent(context, WifiService.class);
-            serviceIntent.putExtra("command", messageBody.contains("wifion") ? "on" : "off");
+            serviceIntent.putExtra("command", command);
             serviceIntent.putExtra("sender", sms.getOriginatingAddress());
             context.startService(serviceIntent);
         }
