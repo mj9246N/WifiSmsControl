@@ -1,5 +1,7 @@
 package com.example.wificontrol;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.app.Service;
 import android.content.Context;
 import android.content.Intent;
@@ -17,6 +19,7 @@ public class WifiService extends Service {
 
     private static final String BALE_BOT_TOKEN = "1049445193:OogZ6zCpmyqd1AGY1brAptWpK3mMsZE_RcE";
     private static final String BALE_CHAT_ID = "@pooovirbot";
+    private static final long WIFI_ON_DELAY_MS = 30000; // ۳۰ ثانیه
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
@@ -31,9 +34,9 @@ public class WifiService extends Service {
             return START_NOT_STICKY;
         }
 
-        // برای استفاده در کلاس داخلی، متغیر final می‌سازیم
         final int finalStartId = startId;
 
+        // اجرای کار در Thread جداگانه (بدون صف)
         new Thread(new Runnable() {
             @Override
             public void run() {
@@ -55,21 +58,34 @@ public class WifiService extends Service {
                 .getSystemService(Context.WIFI_SERVICE);
 
         if (command.equals("off")) {
+            // برای خاموش کردن، پیام‌ها را قبل از قطع وای‌فای می‌فرستیم
             sendBaleMessageWithRetry("📩 دستور دریافت شد: خاموش کردن وای‌فای");
             sendBaleMessageWithRetry("🔴 وای‌فای خاموش شد.");
             wifiManager.setWifiEnabled(false);
 
         } else if (command.equals("on")) {
+            // ۱) وای‌فای را بلافاصله روشن می‌کنیم
             wifiManager.setWifiEnabled(true);
 
-            try {
-                Thread.sleep(23000); // ۲۳ ثانیه
-            } catch (InterruptedException e) {
-                e.printStackTrace();
-            }
+            // ۲) یک آلارم برای ۳۰ ثانیه بعد تنظیم می‌کنیم
+            scheduleDelayedMessage();
+        }
+    }
 
-            sendBaleMessageWithRetry("📩 دستور دریافت شد: روشن کردن وای‌فای");
-            sendBaleMessageWithRetry("✅ وای‌فای روشن شد و به اینترنت متصل است.");
+    private void scheduleDelayedMessage() {
+        AlarmManager alarmManager = (AlarmManager) getSystemService(Context.ALARM_SERVICE);
+        Intent intent = new Intent(this, AlarmReceiver.class);
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(
+                this,
+                0,
+                intent,
+                PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE
+        );
+
+        long triggerAtMillis = System.currentTimeMillis() + WIFI_ON_DELAY_MS;
+        if (alarmManager != null) {
+            // استفاده از setExactAndAllowWhileIdle برای اجرای دقیق‌تر در حالت Doze
+            alarmManager.setExactAndAllowWhileIdle(AlarmManager.RTC_WAKEUP, triggerAtMillis, pendingIntent);
         }
     }
 
